@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作業日報 / Work Log MISUMI</title>
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Day.js for date/time manipulation -->
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/customParseFormat.js"></script>
+    
+    <!-- Toastify for user notifications -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    
+    <!-- html5-qrcode for camera barcode scanning -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        /* Custom styles for better UX */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            font-size: 16px; /* Increased base font size */
+        }
+        .sortable:hover {
+            cursor: pointer;
+            color: #3b82f6; /* Tailwind's blue-500 */
+        }
+        .sort-asc::after {
+            content: ' ▲';
+        }
+        .sort-desc::after {
+            content: ' ▼';
+        }
+        #camera-reader {
+            width: 100%;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        /* Style for form labels */
+        .form-label {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem; /* Add some padding around the icon */
+        }
+        /* Loading spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        select:disabled {
+            background-color: #e5e7eb; /* gray-200 */
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 max-w-7xl">
+        <header class="mb-8">
+            <div class="flex items-baseline space-x-4">
+                <h1 class="text-4xl font-bold text-gray-700">作業日報 / Work Log</h1>
+                <span class="text-4xl font-semibold text-gray-500">MISUMI</span>
+            </div>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Left Side: Input Form -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                <form id="worklog-form" class="space-y-6">
+                    <!-- Form fields -->
+                    <div class="flex items-center space-x-4" title="Order No.">
+                        <label for="order-no" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 6h18v12H3zM6 10v4m3-4v4m3-4v4m3-4v4m3-4v4"/>
+                            </svg>
+                        </label>
+                        <div class="flex-grow flex items-center space-x-2">
+                            <input type="text" id="order-no" name="order_no" required autofocus class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base">
+                            <button type="button" id="toggle-camera-scan" class="p-2 rounded-md bg-gray-100 hover:bg-gray-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h--3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="camera-scanner-container" class="hidden mt-4">
+                        <div id="camera-reader"></div>
+                        <button type="button" id="close-camera-scanner" class="mt-2 w-full text-base text-gray-600 hover:text-red-500">閉じる</button>
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="Work Date">
+                        <label for="work-date" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 14v-2" />
+                            </svg>
+                        </label>
+                        <input type="date" id="work-date" name="work_date" required class="flex-grow block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base">
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="Process">
+                        <label for="process" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                        </label>
+                        <div class="flex-grow">
+                             <select id="process" name="process" required class="hidden">
+                                <option value="旋盤">旋盤</option>
+                                <option value="マシニング">マシニング</option>
+                                <option value="仕上げ">仕上げ</option>
+                                <option value="検査">検査</option>
+                            </select>
+                            <div id="process-buttons" class="flex flex-wrap gap-2">
+                                <!-- Buttons are generated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="Operator">
+                        <label for="operator" class="form-label">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </label>
+                        <div class="flex-grow">
+                            <select id="operator" name="operator" required class="hidden">
+                                <!-- Options will be populated by JavaScript -->
+                            </select>
+                            <div id="operator-buttons" class="flex flex-wrap gap-2">
+                                <!-- Buttons are generated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4 transition-opacity duration-300" title="Machine No.">
+                        <label for="machine-no" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M4 9h16M4 15h16" />
+                            </svg>
+                        </label>
+                        <div class="flex-grow">
+                            <select id="machine-no" name="machine_no" class="hidden">
+                                <!-- Options will be populated by JavaScript -->
+                            </select>
+                            <div id="machine-no-buttons" class="flex flex-wrap gap-2">
+                                <!-- Buttons are generated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4 transition-opacity duration-300" title="Machine">
+                        <label for="machine" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </label>
+                        <input type="text" id="machine" name="machine" readonly class="flex-grow block w-full rounded-md border-gray-200 bg-gray-100 px-3 py-2 text-base text-gray-700 font-medium">
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="Quantity">
+                        <label for="quantity" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7v10l8 4m0-14v10" />
+                            </svg>
+                        </label>
+                        <input type="number" id="quantity" name="quantity" required min="1" value="1" class="flex-grow block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base">
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="Start Time">
+                        <label for="start-time" class="form-label">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </label>
+                        <div class="flex-grow flex flex-wrap items-center gap-2">
+                            <input type="datetime-local" id="start-time" name="start_time" required class="flex-grow min-w-[150px] rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base">
+                            <button type="button" id="set-start-now" class="whitespace-nowrap rounded-md bg-blue-100 px-3 py-2 text-base font-semibold text-blue-700 shadow-sm hover:bg-blue-200">Now</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="End Time">
+                        <label for="end-time" class="form-label">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </label>
+                        <div class="flex-grow flex flex-wrap items-center gap-2">
+                            <input type="datetime-local" id="end-time" name="end_time" required class="flex-grow min-w-[150px] rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base">
+                            <button type="button" id="set-end-now" class="whitespace-nowrap rounded-md bg-blue-100 px-3 py-2 text-base font-semibold text-blue-700 shadow-sm hover:bg-blue-200">Now</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4" title="Status">
+                        <label for="status" class="form-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </label>
+                        <div class="flex-grow">
+                            <select id="status" name="status" required class="hidden">
+                                <option value="完了">完了</option>
+                                <option value="未">未</option>
+                            </select>
+                            <div id="status-buttons" class="flex flex-wrap gap-2">
+                                <!-- Buttons are generated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="pt-2">
+                        <p class="text-base text-gray-600">Lead Time: <span id="lead-time-display" class="font-bold">--</span> min</p>
+                    </div>
+
+                    <div class="flex space-x-4 pt-4">
+                        <button type="submit" id="save-button" class="flex-1 rounded-md bg-indigo-600 px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 flex justify-center items-center">
+                            <span id="save-button-text">Save</span>
+                            <div id="save-spinner" class="loader hidden"></div>
+                        </button>
+                        <button type="button" id="clear-form" class="flex-1 rounded-md bg-white px-4 py-3 text-base font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Clear</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Side: Log List -->
+            <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-md">
+                <div id="stats-cards" class="grid grid-cols-1 gap-4 mb-6">
+                    <div class="bg-blue-200 p-4 rounded-lg text-center flex flex-col justify-between">
+                        <div>
+                            <p class="text-xl font-bold text-blue-900">本日の記録件数</p>
+                            <p class="text-xs font-semibold text-blue-800">Total Records Today</p>
+                        </div>
+                        <p id="stats-total-count" class="text-4xl font-bold text-blue-900 mt-2">0</p>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                    <input type="text" id="search-box" placeholder="Search Order No. or Operator..." class="w-full sm:w-1/2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="order_no">Order No.</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="work_date">Work Date</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="process">Process</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="operator">Operator</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="machine">Machine</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="quantity">Qty</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable sort-desc" data-key="start_time">Start</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="end_time">End</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="lead_time_min">Lead (min)</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sortable" data-key="status">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Rows will be inserted here by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+dayjs.extend(dayjs_plugin_customParseFormat);
+
+// =================================================================================
+// App State & Constants
+// =================================================================================
+
+// !!! 【重要】ここを編集してください !!!
+// ★★★ 新しいGoogle Apps ScriptのウェブアプリURLをここに貼り付けます ★★★
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxLVr2DOUr3wmLdRDHtZwdcWivfMXbGXXguxbIMeeoF7Y8kmeYKAvkXrmhB0RfzNYGl/exec'; 
+
+const MACHINE_MAP = {
+    '1': 'QUICK TURN 200',
+    '2': 'HCN 4000',
+    '3': 'VARIAXIS C600'
+};
+
+let worklogs = []; // Data is now in-memory only for the current session
+let sortConfig = { key: 'start_time', direction: 'desc' };
+let html5QrCode;
+let isCameraScanning = false;
+
+// =================================================================================
+// DOM Elements
+// =================================================================================
+const form = document.getElementById('worklog-form');
+const workDateInput = document.getElementById('work-date');
+const operatorInput = document.getElementById('operator');
+const processInput = document.getElementById('process');
+const machineNoInput = document.getElementById('machine-no');
+const machineInput = document.getElementById('machine');
+const quantityInput = document.getElementById('quantity');
+const startTimeInput = document.getElementById('start-time');
+const endTimeInput = document.getElementById('end-time');
+const statusInput = document.getElementById('status');
+const orderNoInput = document.getElementById('order-no');
+const setStartNowBtn = document.getElementById('set-start-now');
+const setEndNowBtn = document.getElementById('set-end-now');
+const leadTimeDisplay = document.getElementById('lead-time-display');
+const clearFormBtn = document.getElementById('clear-form');
+const logTableBody = document.getElementById('log-table-body');
+const searchBox = document.getElementById('search-box');
+const saveButton = document.getElementById('save-button');
+const saveButtonText = document.getElementById('save-button-text');
+const saveSpinner = document.getElementById('save-spinner');
+const toggleCameraBtn = document.getElementById('toggle-camera-scan');
+const cameraContainer = document.getElementById('camera-scanner-container');
+const closeCameraBtn = document.getElementById('close-camera-scanner');
+
+// Stats Cards
+const statsTotalCount = document.getElementById('stats-total-count');
+
+// =================================================================================
+// Initialization
+// =================================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    initializeForm();
+    render();
+    setupEventListeners();
+    orderNoInput.focus();
+});
+
+window.onload = function() {
+    try {
+        if (typeof Html5Qrcode !== 'undefined') {
+            html5QrCode = new Html5Qrcode("camera-reader");
+        } else {
+            console.error("Html5Qrcode library not loaded.");
+        }
+    } catch(e) {
+        console.error("Could not initialize Html5Qrcode.", e);
+    }
+};
+
+// =================================================================================
+// Core Logic (Save, Validate, Calculate)
+// =================================================================================
+
+/**
+ * Handles form submission event.
+ * @param {Event} event - The form submission event.
+ */
+async function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    if (SCRIPT_URL === '') {
+        showToast('エラー: Google Apps ScriptのURLが設定されていません。', 'error');
+        console.error("Please set the SCRIPT_URL variable in the script tag.");
+        return;
+    }
+    
+    const isMachineRequired = processInput.value === '旋盤' || processInput.value === 'マシニング';
+
+    // 1. Get data from form
+    const logData = {
+        id: crypto.randomUUID(),
+        work_date: workDateInput.value,
+        operator: operatorInput.value,
+        process: processInput.value,
+        machine_no: isMachineRequired ? machineNoInput.value : '',
+        machine: isMachineRequired ? machineInput.value.trim() : '',
+        quantity: parseInt(quantityInput.value, 10),
+        start_time: startTimeInput.value,
+        end_time: endTimeInput.value,
+        status: statusInput.value,
+        order_no: orderNoInput.value.trim().replace(/\//g, '_').replace(/[^a-zA-Z0-9-_]/g, ''),
+        created_at: dayjs().toISOString(),
+        updated_at: dayjs().toISOString(),
+    };
+    
+    // 2. Validate data
+    if (!validateLog(logData)) {
+        return;
+    }
+
+    // 3. Calculate lead time
+    logData.lead_time_min = calculateLeadTime(logData.start_time, logData.end_time);
+    
+    // UI feedback for saving
+    setSavingState(true);
+
+    try {
+        // 4. Send data to Google Sheet
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', 
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(logData)
+        });
+        
+        // 5. Update local state and UI
+        worklogs.push(logData);
+        render();
+        clearFormForNextEntry();
+        showToast('スプレッドシートに保存しました！', 'success');
+
+    } catch (error) {
+        console.error('Error saving to Google Sheet:', error);
+        showToast(`保存エラー: ${error.message}`, 'error');
+    } finally {
+        // 6. Reset UI
+        setSavingState(false);
+    }
+}
+
+/**
+ * Validates the log data before saving.
+ * @param {object} log - The log data object.
+ * @returns {boolean} - True if valid, false otherwise.
+ */
+function validateLog(log) {
+    if (!log.operator || !log.process || !log.order_no || !log.status) {
+        showToast('担当者、工程、注文番号、ステータスは必須です。', 'error');
+        return false;
+    }
+
+    const isMachineRequired = log.process === '旋盤' || log.process === 'マシニング';
+    if (isMachineRequired && (!log.machine_no || !log.machine)) {
+        showToast('旋盤またはマシニング工程では、機械の選択は必須です。', 'error');
+        return false;
+    }
+
+    if (!log.quantity || log.quantity <= 0) {
+        showToast('数量は1以上の数値を入力してください。', 'error');
+        return false;
+    }
+    if (!log.start_time || !log.end_time) {
+        showToast('開始時刻と終了時刻は必須です。', 'error');
+        return false;
+    }
+    return true;
+}
+
+
+/**
+ * Calculates lead time in minutes, handling overnight shifts.
+ * @param {string} start - The start datetime string.
+ * @param {string} end - The end datetime string.
+ * @returns {number} - The lead time in minutes.
+ */
+function calculateLeadTime(start, end) {
+    let startTime = dayjs(start);
+    let endTime = dayjs(end);
+
+    if (endTime.isBefore(startTime)) {
+        endTime = endTime.add(1, 'day');
+    }
+
+    return endTime.diff(startTime, 'minute');
+}
+
+// =================================================================================
+// UI Rendering & Updates
+// =================================================================================
+function setSavingState(isSaving) {
+    if (isSaving) {
+        saveButton.disabled = true;
+        saveButtonText.classList.add('hidden');
+        saveSpinner.classList.remove('hidden');
+    } else {
+        saveButton.disabled = false;
+        saveButtonText.classList.remove('hidden');
+        saveSpinner.classList.add('hidden');
+    }
+}
+/**
+ * Renders the entire view (table and stats).
+ */
+function render() {
+    renderTable();
+    updateStats();
+}
+
+/**
+ * Renders the work log table with current data, filters, and sorting.
+ */
+function renderTable() {
+    logTableBody.innerHTML = '';
+    const today = workDateInput.value;
+    const searchTerm = searchBox.value.toLowerCase();
+
+    let filteredLogs = worklogs
+        .filter(log => log.work_date === today)
+        .filter(log =>
+            log.order_no.toLowerCase().includes(searchTerm) ||
+            log.operator.toLowerCase().includes(searchTerm)
+        );
+
+    // Sorting
+    filteredLogs.sort((a, b) => {
+        const valA = a[sortConfig.key];
+        const valB = b[sortConfig.key];
+        let comparison = 0;
+        if (sortConfig.key === 'quantity') {
+            return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        }
+        if (valA > valB) {
+            comparison = 1;
+        } else if (valA < valB) {
+            comparison = -1;
+        }
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+
+    if (filteredLogs.length === 0) {
+        logTableBody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-gray-500">本日のデータがありません。</td></tr>`;
+        return;
+    }
+
+    filteredLogs.forEach(log => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 whitespace-nowrap text-base font-semibold">${log.order_no}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.work_date}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.process}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.operator}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.machine}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.quantity}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${dayjs(log.start_time).format('MM-DD HH:mm')}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${dayjs(log.end_time).format('MM-DD HH:mm')}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.lead_time_min}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-base">${log.status}</td>
+        `;
+        logTableBody.appendChild(row);
+    });
+}
+
+/**
+ * Updates the statistics cards based on today's logs.
+ */
+function updateStats() {
+    const today = workDateInput.value;
+    const todaysLogs = worklogs.filter(log => log.work_date === today);
+
+    const totalCount = todaysLogs.length;
+    statsTotalCount.textContent = totalCount;
+}
+
+/**
+ * Initializes the form with default values.
+ */
+function initializeForm() {
+    workDateInput.value = dayjs().format('YYYY-MM-DD');
+    const now = dayjs().format('YYYY-MM-DDTHH:mm');
+    startTimeInput.value = now;
+    endTimeInput.value = now;
+    quantityInput.value = '1';
+    
+    // Initialize Process buttons
+    const processOptions = Array.from(processInput.options).map(opt => opt.value);
+    updateButtonGroup(processInput, processOptions);
+
+    // Initialize Status buttons
+    const statusOptions = Array.from(statusInput.options).map(opt => opt.value);
+    updateButtonGroup(statusInput, statusOptions);
+    statusInput.value = '完了'; // Default to '完了'
+    updateButtonGroup(statusInput, statusOptions); // Re-render to show active state
+    
+    updateLeadTimeDisplay();
+    handleProcessChange(); // Set initial state for all dependent fields
+}
+
+/**
+ * Clears the form for the next entry, keeping some fields.
+ */
+function clearFormForNextEntry() {
+    orderNoInput.value = '';
+    orderNoInput.focus();
+    quantityInput.value = '1';
+    const now = dayjs().format('YYYY-MM-DDTHH:mm');
+    startTimeInput.value = now;
+    endTimeInput.value = now;
+    updateLeadTimeDisplay();
+}
+
+/**
+ * Clears the entire form.
+ */
+function clearForm() {
+    form.reset();
+    initializeForm();
+    orderNoInput.focus();
+}
+
+/**
+ * Updates the lead time display based on form inputs.
+ */
+function updateLeadTimeDisplay() {
+    if (startTimeInput.value && endTimeInput.value) {
+        const leadTime = calculateLeadTime(startTimeInput.value, endTimeInput.value);
+        leadTimeDisplay.textContent = isNaN(leadTime) ? '--' : leadTime;
+    } else {
+        leadTimeDisplay.textContent = '--';
+    }
+}
+
+/**
+ * Updates the machine name input based on the machine number selection.
+ */
+function updateMachineName() {
+    const selectedNo = machineNoInput.value;
+    machineInput.value = MACHINE_MAP[selectedNo] || '';
+}
+
+/**
+ * Renders a group of buttons based on a hidden select element and options.
+ * @param {HTMLSelectElement} selectElement - The hidden select element that holds the state.
+ * @param {string[]} options - An array of option values to render as buttons.
+ */
+function updateButtonGroup(selectElement, options) {
+    const container = selectElement.nextElementSibling;
+    container.innerHTML = '';
+    
+    if (!Array.isArray(options)) return;
+    
+    const previousValue = selectElement.value;
+
+    selectElement.innerHTML = '';
+    options.forEach(opt => {
+        const optionEl = document.createElement('option');
+        optionEl.value = opt;
+        optionEl.textContent = opt;
+        selectElement.appendChild(optionEl);
+    });
+    
+    if (options.includes(previousValue) && previousValue) {
+        selectElement.value = previousValue;
+    } else {
+        selectElement.value = options[0] || '';
+    }
+    
+    const currentValue = selectElement.value;
+
+    options.forEach(optionValue => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = optionValue;
+        button.dataset.value = optionValue;
+        
+        const isSelected = optionValue === currentValue;
+        
+        button.className = `px-3 py-1.5 text-sm font-semibold rounded-md border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150 ${
+            isSelected 
+            ? 'bg-indigo-600 text-white border-transparent shadow' 
+            : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+        }`;
+
+        button.addEventListener('click', (e) => {
+            if (e.currentTarget.parentElement.classList.contains('pointer-events-none')) return;
+
+            if (selectElement.value !== optionValue) {
+                selectElement.value = optionValue;
+                selectElement.dispatchEvent(new Event('change'));
+            }
+        });
+        container.appendChild(button);
+    });
+}
+
+/**
+ * Handles all conditional logic when the process is changed.
+ */
+function handleProcessChange() {
+    const selectedProcess = processInput.value;
+    let operatorOptions = [];
+    let machineNoOptions = [];
+    let isMachineRequired = false;
+
+    switch (selectedProcess) {
+        case '旋盤':
+            operatorOptions = ['ヒエン'];
+            machineNoOptions = ['1'];
+            isMachineRequired = true;
+            break;
+        case 'マシニング':
+            operatorOptions = ['ナウィル', '松原'];
+            machineNoOptions = ['2', '3'];
+            isMachineRequired = true;
+            break;
+        case '仕上げ':
+            operatorOptions = ['イルファン'];
+            isMachineRequired = false;
+            break;
+        case '検査':
+            operatorOptions = ['山口'];
+            isMachineRequired = false;
+            break;
+    }
+    
+    const processOptions = Array.from(processInput.options).map(opt => opt.value);
+    updateButtonGroup(processInput, processOptions);
+
+    updateButtonGroup(operatorInput, operatorOptions);
+    updateButtonGroup(machineNoInput, machineNoOptions);
+    
+    const operatorContainer = operatorInput.nextElementSibling;
+    const machineNoContainer = machineNoInput.nextElementSibling;
+    const machineContainer = machineInput.closest('.flex');
+    
+    machineNoInput.required = isMachineRequired;
+    machineInput.required = isMachineRequired;
+
+    if (operatorOptions.length <= 1) {
+        operatorContainer.classList.add('opacity-75', 'pointer-events-none');
+    } else {
+        operatorContainer.classList.remove('opacity-75', 'pointer-events-none');
+    }
+
+    if (isMachineRequired) {
+        machineNoContainer.parentElement.closest('.flex').classList.remove('opacity-50', 'pointer-events-none');
+        machineContainer.classList.remove('opacity-50');
+        updateMachineName();
+    } else {
+        machineNoContainer.parentElement.closest('.flex').classList.add('opacity-50', 'pointer-events-none');
+        machineContainer.classList.add('opacity-50');
+        machineInput.value = '';
+    }
+}
+
+
+/**
+ * Shows a toast notification.
+ * @param {string} message - The message to display.
+ * @param {'info'|'success'|'warning'|'error'} type - The type of toast.
+ */
+function showToast(message, type = 'info') {
+    const colors = {
+        info: 'linear-gradient(to right, #00b09b, #96c93d)',
+        success: 'linear-gradient(to right, #00b09b, #96c93d)',
+        warning: 'linear-gradient(to right, #f2994a, #f2c94c)',
+        error: 'linear-gradient(to right, #eb5757, #f2994c)',
+    };
+    Toastify({
+        text: message,
+        duration: 3000,
+        close: true,
+        gravity: "top",
+        position: "right",
+        stopOnFocus: true,
+        style: {
+            background: colors[type],
+        },
+    }).showToast();
+}
+
+
+// =================================================================================
+// Features (Camera & Sorting)
+// =================================================================================
+/**
+ * Starts the camera for barcode scanning.
+ */
+async function startCameraScan() {
+    if (isCameraScanning) return;
+    if (!html5QrCode) {
+        showToast('カメラの準備ができていません。', 'warning');
+        return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('お使いのブラウザはカメラ機能に対応していません。', 'error');
+        return;
+    }
+
+    cameraContainer.classList.remove('hidden');
+    isCameraScanning = true;
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            {
+                fps: 10,
+                qrbox: { width: 250, height: 250 }
+            },
+            (decodedText, decodedResult) => {
+                orderNoInput.value = decodedText;
+                stopCameraScan();
+                showToast(`スキャン成功: ${decodedText}`, 'success');
+                orderNoInput.focus();
+            },
+            (errorMessage) => {}
+        );
+    } catch (err) {
+        console.error("Camera scan error:", err);
+        let errorMessage = 'カメラの起動に失敗しました。';
+        if (window.location.protocol !== 'https:') {
+            errorMessage += ' HTTPS接続が必要です。';
+        } else {
+            errorMessage += ' カメラへのアクセスを許可してください。';
+        }
+        showToast(errorMessage, 'error');
+        stopCameraScan();
+    }
+}
+
+/**
+ * Stops the camera scanning.
+ */
+function stopCameraScan() {
+    if (!isCameraScanning || !html5QrCode) return;
+    html5QrCode.stop().then(() => {
+        cameraContainer.classList.add('hidden');
+        isCameraScanning = false;
+    }).catch(err => {
+        console.error("Failed to stop camera:", err);
+        cameraContainer.classList.add('hidden');
+        isCameraScanning = false;
+    });
+}
+
+/**
+ * Handles table header clicks for sorting.
+ * @param {string} key - The key to sort by.
+ */
+function handleSort(key) {
+    document.querySelectorAll('.sortable').forEach(th => {
+        if (th.dataset.key !== key) {
+            th.classList.remove('sort-asc', 'sort-desc');
+        }
+    });
+
+    const header = document.querySelector(`.sortable[data-key="${key}"]`);
+    if (sortConfig.key === key) {
+        sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortConfig.key = key;
+        sortConfig.direction = 'desc';
+    }
+
+    header.classList.remove('sort-asc', 'sort-desc');
+    header.classList.add(sortConfig.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+
+    renderTable();
+}
+
+
+// =================================================================================
+// Event Listeners Setup
+// =================================================================================
+function setupEventListeners() {
+    form.addEventListener('submit', handleFormSubmit);
+
+    // Prevent form submission on Enter key press in any input field
+    form.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+        }
+    });
+    
+    setStartNowBtn.addEventListener('click', () => {
+        startTimeInput.value = dayjs().format('YYYY-MM-DDTHH:mm');
+        updateLeadTimeDisplay();
+    });
+    
+    setEndNowBtn.addEventListener('click', () => {
+        endTimeInput.value = dayjs().format('YYYY-MM-DDTHH:mm');
+        updateLeadTimeDisplay();
+    });
+
+    [startTimeInput, endTimeInput].forEach(input => {
+        input.addEventListener('change', updateLeadTimeDisplay);
+    });
+    
+    clearFormBtn.addEventListener('click', clearForm);
+    
+    workDateInput.addEventListener('change', render);
+    
+    searchBox.addEventListener('input', renderTable);
+    
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => handleSort(th.dataset.key));
+    });
+
+    toggleCameraBtn.addEventListener('click', () => {
+        if (isCameraScanning) {
+            stopCameraScan();
+        } else {
+            startCameraScan();
+        }
+    });
+
+    closeCameraBtn.addEventListener('click', stopCameraScan);
+
+    processInput.addEventListener('change', handleProcessChange);
+    
+    operatorInput.addEventListener('change', () => {
+        const options = Array.from(operatorInput.options).map(o => o.value);
+        updateButtonGroup(operatorInput, options);
+    });
+    
+    machineNoInput.addEventListener('change', () => {
+        const options = Array.from(machineNoInput.options).map(o => o.value);
+        updateButtonGroup(machineNoInput, options);
+        updateMachineName();
+    });
+    
+    statusInput.addEventListener('change', () => {
+        const statusOptions = Array.from(statusInput.options).map(opt => opt.value);
+        updateButtonGroup(statusInput, statusOptions);
+    });
+}
+
+</script>
+</body>
+</html>
+
